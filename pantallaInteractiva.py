@@ -1,5 +1,11 @@
 import matplotlib.pyplot as plt
 
+plt.rcParams['font.family'] = 'serif'  # Usa una fuente serif (similar a LaTeX)
+plt.rcParams['mathtext.fontset'] = 'cm'  # Usa las fuentes "Computer Modern" (de LaTeX)
+plt.rcParams['mathtext.rm'] = 'serif'
+
+# event.button == 1 CLICK IZQUIERDO
+# event.button == 3 CLICK DERECHIO 
 # 3b1b
 fondo = "#000000"  
 azul = "#1c758a"
@@ -15,10 +21,10 @@ def configurar_ejes(ax):
     ax.set_facecolor(fondo)
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
-    ax.set_title("Curvas de Bézier", color=blanco, fontsize=20)
+    ax.set_title(r"Curvas de Bézier", color=blanco, fontsize=20)
     ax.text(
         9.5, -0.5,
-        "Clic izquierdo: Agregar\nClic derecho: Seleccionar/Mover\n'd': Borrar nodo",
+        "Click izq: Seleccionar\\Mover \n Tecla d: Borrar nodo",
         fontsize=10, color=blanco, ha="right", va="top"
     )
     ax.tick_params(colors=blanco)
@@ -29,6 +35,7 @@ def configurar_ejes(ax):
     ax.xaxis.label.set_color(blanco)
     ax.yaxis.label.set_color(blanco)
 
+
 def pantalla_interactiva():
     # acomodar
     fig, ax = plt.subplots()
@@ -38,7 +45,7 @@ def pantalla_interactiva():
     # datos 
     puntos = []
     scatter = None
-    selected_point = None 
+    punto_actual = None 
 
     # actualizar dibujo
     def actualizar_grafico():
@@ -46,59 +53,75 @@ def pantalla_interactiva():
         nonlocal scatter
         ax.clear()
         configurar_ejes(ax)  
-
         # puntos y  lineas
         x_vals = [p[0] for p in puntos]
         y_vals = [p[1] for p in puntos]
-        scatter = ax.scatter(x_vals, y_vals, color=azul_claro)
         if len(puntos) > 1:
-            ax.plot(x_vals, y_vals, color=azul, linewidth=1.5, linestyle="--")
+            ax.plot(x_vals, y_vals, color=blanco, linewidth=0.8) #, linestyle="--"
+        scatter = ax.scatter(x_vals, y_vals, color=amarillo)
 
-        # seleecionado
-         # Seleccionar
-        if selected_point is not None:
+        # seleccionar
+        if punto_actual is not None:
             ax.scatter(
-                puntos[selected_point][0], puntos[selected_point][1],
-                color=amarillo, s=100, label="Seleccionado"
+                puntos[punto_actual][0], puntos[punto_actual][1],
+                color=rojo, s=100, label="Seleccionado"
             )
             ax.legend(labelcolor=blanco, facecolor=fondo, edgecolor=blanco)   
 
         fig.canvas.draw()
 
     # dar click
-    def on_click(event):
-        nonlocal selected_point
-        if event.button == 1:  # Clic izquierdo
-            if event.xdata is not None and event.ydata is not None:
-                if selected_point is not None:  # Si hay un punto seleccionado
-                    puntos[selected_point] = [event.xdata, event.ydata]  # Mover el punto seleccionado
-                    print(f"Punto movido a: {puntos[selected_point]}")
-                    selected_point = None  # Deseleccionar el punto
-                else:
-                    puntos.append([event.xdata, event.ydata])  # Agregar un nuevo punto
+    def on_click(event): 
+        print("antes del click:", puntos)  
+        nonlocal punto_actual
+        # si se dio click &&  el clikc fue dentro de la pantalla
+        if event.button == 1 and event.xdata is not None and event.ydata is not None:
+            print("click izquierdo")
+            # si hay un punto seleccionado
+            if punto_actual is not None:
+                puntos[punto_actual] = [event.xdata, event.ydata] 
+                print(f"se movio a {puntos[punto_actual]}")
+                punto_actual = None  
                 actualizar_grafico()
-        elif event.button == 3:  # Clic derecho para seleccionar un punto
-            if scatter:
-                # Detectar el punto más cercano al clic
-                xdata = event.xdata
-                ydata = event.ydata
-                distances = [(x - xdata) ** 2 + (y - ydata) ** 2 for x, y in puntos]
-                selected_point = distances.index(min(distances)) if distances else None
-                print(f"Punto seleccionado: {puntos[selected_point]}" if selected_point is not None else "Ningún punto seleccionado")
-                actualizar_grafico()
+        
+            # si no, podemos seleccionar, o agregar uno nuevo
+            else:       
+                seleccionado = None
+                if scatter:
+                    xdata = event.xdata
+                    ydata = event.ydata
+                    distances = [(x - xdata) ** 2 + (y - ydata) ** 2 for x, y in puntos]
+                    print(min(distances))
+                    if( min(distances) < 0.5):
+                        seleccionado = distances.index(min(distances)) if distances else None
 
+                 # SELECCIONAR
+                if seleccionado is not None:
+                    punto_actual = seleccionado
+                    print(f"Punto seleccionado: {puntos[seleccionado]}")
+                    actualizar_grafico()
+                    
+                # AGREGAR
+                else:
+                    puntos.append([event.xdata, event.ydata])  
+                    actualizar_grafico()
+        print("al final del click:", puntos)  
+    
+    
     # eliminar
-    def on_key(event):
-        nonlocal selected_point
-        if event.key == 'd' and selected_point is not None:  # Tecla 'd' para eliminar
-            print(f"Punto eliminado: {puntos[selected_point]}")
-            puntos.pop(selected_point)
-            selected_point = None
+    def on_key(event): 
+        nonlocal punto_actual
+        # Tecla D eliminar
+        if event.key == 'd' and punto_actual is not None: 
+            print(f"se elimino {puntos[punto_actual]}")
+            puntos.pop(punto_actual)
+            punto_actual = None
             actualizar_grafico()
 
+    # que se mueva
     def on_motion(event):
-        if selected_point is not None and event.xdata is not None and event.ydata is not None:
-            puntos[selected_point] = [event.xdata, event.ydata]
+        if punto_actual is not None and event.xdata is not None and event.ydata is not None:
+            puntos[punto_actual] = [event.xdata, event.ydata]
             actualizar_grafico()
 
     # para que funcione
